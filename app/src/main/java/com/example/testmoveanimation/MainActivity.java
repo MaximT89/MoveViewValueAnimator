@@ -1,99 +1,158 @@
 package com.example.testmoveanimation;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.view.ViewCompat;
+import androidx.lifecycle.ViewModelProvider;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
-import android.animation.ValueAnimator;
-import android.annotation.SuppressLint;
 import android.graphics.Point;
-import android.graphics.Rect;
-import android.location.Location;
 import android.os.Bundle;
-import android.util.Log;
+import android.os.CountDownTimer;
 import android.view.Display;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
 import android.view.View;
+import android.view.animation.LinearInterpolator;
 import android.widget.ImageView;
-import android.widget.RelativeLayout;
-import android.widget.TextView;
+import android.widget.LinearLayout;
 
 import com.example.testmoveanimation.databinding.ActivityMainBinding;
 
-import java.util.concurrent.TimeUnit;
-
-import io.reactivex.rxjava3.annotations.NonNull;
-import io.reactivex.rxjava3.core.Completable;
-import io.reactivex.rxjava3.core.CompletableObserver;
-import io.reactivex.rxjava3.disposables.Disposable;
-import io.reactivex.rxjava3.functions.Consumer;
-import io.reactivex.rxjava3.observers.DisposableCompletableObserver;
-import io.reactivex.rxjava3.subjects.CompletableSubject;
+import java.util.Random;
 
 public class MainActivity extends AppCompatActivity {
 
     private ActivityMainBinding binding;
+    private MainActivityViewModel viewModel;
+    private final int speedItem = 4000;
+    private final int speedCreaterViews = 1000;
 
-    float imageXPosition;
-    float imageYPosition;
-    int score = 0;
+    private int widthDisplay;
+    private int heightDisplay;
 
-    @SuppressLint({"ClickableViewAccessibility", "SetTextI18n"})
+    private int widthItem = 150;
+    private int heightItem = 150;
+    private int score = 0;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityMainBinding.inflate(LayoutInflater.from(this));
         setContentView(binding.getRoot());
 
-//        final TextView positionTextView = findViewById(R.id.text_view);
-//        ImageView myimage = findViewById(R.id.img_orc);
-//
-//        ObjectAnimator translateXAnimation = ObjectAnimator.ofFloat(myimage, "translationX", 0f, 0f);
-//        ObjectAnimator translateYAnimation = ObjectAnimator.ofFloat(myimage, "translationY", 0f, 800f);
-////        translateXAnimation.setRepeatCount(ValueAnimator.INFINITE);
-////        translateYAnimation.setRepeatCount(ValueAnimator.INFINITE);
-//        translateXAnimation.setRepeatCount(0);
-//        translateYAnimation.setRepeatCount(0);
-//
-//        AnimatorSet set = new AnimatorSet();
-//        set.setDuration(10000);
-//        set.playTogether(translateXAnimation, translateYAnimation);
-//        set.start();
-//
-//        translateXAnimation.addUpdateListener(animation -> imageXPosition = (Float) animation.getAnimatedValue());
-//
-//        translateYAnimation.addUpdateListener(animation -> {
-//            imageYPosition = (Float) animation.getAnimatedValue();
-//            @SuppressLint("DefaultLocale") String position = String.format("X:%d Y:%d", (int) imageXPosition, (int) imageYPosition);
-//            positionTextView.setText(position);
-//            if (imageYPosition == 800) {
-//                binding.textScore.setText("Complete");
-//            }
-//        });
-
-        binding.imgOrc.setAlpha(0f);
-        binding.textScore.setAlpha(0f);
-        binding.textView.setAlpha(0f);
-
-        fadeIn(binding.imgOrc, 3000L)
-                .andThen(fadeIn(binding.textScore, 4000L))
-                .andThen(fadeIn(binding.textView, 3000L))
-                .subscribe();
-
-//        binding.imgOrc.setOnClickListener(v -> {
-//            score++;
-//            binding.textScore.setText(String.valueOf(score));
-//        });
+        getDisplaySize();
+        initView();
     }
 
-    private Completable fadeIn(View view, Long duration) {
-        CompletableSubject animationSubject = CompletableSubject.create();
-        return animationSubject.doOnSubscribe(disposable ->
-                ViewCompat.animate(view)
-                        .setDuration(duration)
-                        .alpha(1f)
-                        .withEndAction(animationSubject::onComplete));
+    private void initView() {
+        viewModel = new ViewModelProvider(this).get(MainActivityViewModel.class);
+
+        viewModel.getIsGame();
+        binding.btnStart.setOnClickListener(v -> {
+            startGame();
+            hideBtnStart();
+        });
+    }
+
+    private void showBtnStart() {
+        binding.btnStart.setVisibility(View.VISIBLE);
+    }
+
+    private void hideBtnStart() {
+        binding.btnStart.setVisibility(View.GONE);
+    }
+
+    private void startGame() {
+        viewModel.isGame.setValue(true);
+        clearAllItemInRoot();
+        updateScore(0);
+        updateTextScore();
+        startGameTimer();
+    }
+
+    private void clearAllItemInRoot() {
+        binding.rootLayout.removeAllViews();
+    }
+
+    private void updateScore(int i) {
+        score = i;
+    }
+
+    private void updateTextScore() {
+        binding.textScore.setText(String.valueOf(score));
+    }
+
+    private void startGameTimer() {
+        new CountDownTimer(10000, speedCreaterViews) {
+            @Override
+            public void onTick(long millisUntilFinished) {
+                binding.textView.setText(String.valueOf(millisUntilFinished / 1000));
+
+                viewModel.getIsGame().observe(MainActivity.this, aBoolean -> {
+                    if (aBoolean) {
+                        createImg();
+                    }
+                });
+            }
+
+            @Override
+            public void onFinish() {
+                stopGame();
+                showBtnStart();
+            }
+        }.start();
+    }
+
+    private void stopGame() {
+        viewModel.isGame.setValue(false);
+        clearAllItemInRoot();
+    }
+
+    private void createImg() {
+        LinearLayout.LayoutParams params = new LinearLayout
+                .LayoutParams(widthItem, heightItem);
+        params.setMarginStart(getMarginStart());
+
+        ImageView imageView = new ImageView(this);
+        imageView.setImageResource(R.drawable.orc);
+        imageView.setLayoutParams(params);
+        binding.rootLayout.addView(imageView);
+
+        ObjectAnimator translateYAnimation = ObjectAnimator.ofFloat(imageView, "translationY", 0f, heightDisplay - heightItem);
+        translateYAnimation.setRepeatCount(0);
+
+        AnimatorSet set = new AnimatorSet();
+        set.setDuration(speedItem);
+        set.playTogether(translateYAnimation);
+        set.setInterpolator(new LinearInterpolator());
+        set.start();
+
+        set.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                super.onAnimationEnd(animation);
+                binding.rootLayout.removeView(imageView);
+            }
+        });
+
+        imageView.setOnClickListener(v -> {
+            updateScore(++score);
+            updateTextScore();
+            binding.rootLayout.removeView(imageView);
+            set.cancel();
+        });
+    }
+
+    private int getMarginStart() {
+        return new Random().nextInt(widthDisplay - widthItem);
+    }
+
+    private void getDisplaySize() {
+        Display display = getWindowManager().getDefaultDisplay();
+        Point size = new Point();
+        display.getSize(size);
+        widthDisplay = size.x;
+        heightDisplay = size.y;
     }
 }
