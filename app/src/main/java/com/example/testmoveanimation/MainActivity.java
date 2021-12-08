@@ -69,6 +69,8 @@ public class MainActivity extends AppCompatActivity {
         updateScore(0);
         updateTextScore();
         startGameTimer();
+        // что то написал
+
     }
 
     private void clearAllItemInRoot() {
